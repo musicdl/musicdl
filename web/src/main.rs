@@ -1,4 +1,5 @@
 use actix_web::{web, App, HttpServer};
+use color_eyre::Result;
 use dotenvy::dotenv;
 use middlewares::auth::AuthMiddleware;
 use secrecy::{ExposeSecret, Secret};
@@ -13,7 +14,12 @@ mod schema;
 mod utils;
 
 #[actix_web::main]
-async fn main() -> Result<(), anyhow::Error> {
+async fn main() -> Result<()> {
+    color_eyre::install()?;
+
+    std::env::set_var("RUST_LOG", "debug");
+    env_logger::init();
+
     let stdout_log = tracing_subscriber::fmt::layer().pretty();
     let file_appender =
         tracing_appender::rolling::hourly(std::env::current_dir()?, "logs/debug.log");
@@ -44,7 +50,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     web::scope("/users")
                         .route("/createuser", web::post().to(routes::user::create_user))
                         .route("/login", web::post().to(routes::user::login))
-                        .route("/logout", web::get().to(routes::user::logout)),
+                        .route("/logout", web::post().to(routes::user::logout)),
                 )
                 .service(
                     web::scope("/songs")
@@ -76,9 +82,9 @@ async fn main() -> Result<(), anyhow::Error> {
                             web::post().to(routes::playlist::remove_songs_from_playlist),
                         )
                         .route("/rename", web::post().to(routes::playlist::rename_playlist))
-                        .route("/delete", web::post().to(routes::playlist::delete_playlist))
-                        .app_data(web::Data::new(pool.clone())),
-                ),
+                        .route("/delete", web::post().to(routes::playlist::delete_playlist)),
+                )
+                .app_data(web::Data::new(pool.clone())),
         )
     })
     //.listen(listener)?

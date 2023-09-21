@@ -99,7 +99,8 @@ pub async fn create_empty_playlist(
 
     match playlist {
         Ok(pl_id) => HttpResponse::Ok().json(json!({ "playlist_id": pl_id })),
-        Err(_) => {
+        Err(e) => {
+            tracing::error!("Error: {:#?}", e);
             tracing::error!("Could not create playlist: {:#?}", req_json);
             HttpResponse::InternalServerError().finish()
         }

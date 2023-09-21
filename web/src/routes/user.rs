@@ -76,14 +76,20 @@ pub async fn login(
                     Ok(_) => {
                         HttpResponse::Ok().json(json!({ "session_id": session_id.expose_secret() }))
                     }
-                    Err(_) => HttpResponse::InternalServerError().finish(),
+                    Err(_) => {
+                        tracing::error!("Cannot create session for user: {}", &user.user_id);
+                        HttpResponse::InternalServerError().finish()
+                    }
                 }
             } else {
                 HttpResponse::Unauthorized().finish()
             }
         }
         Ok(None) => HttpResponse::NotFound().finish(),
-        Err(_) => HttpResponse::InternalServerError().finish(),
+        Err(_) => {
+            tracing::error!("Cannot get user from db for login: {}", &req.username);
+            HttpResponse::InternalServerError().finish()
+        }
     }
 }
 
@@ -112,6 +118,7 @@ pub async fn logout(data: web::Data<sqlx::PgPool>, req: HttpRequest) -> impl Res
     }
 
     if session_dao.expire_session(&session_token).await.is_err() {
+        tracing::error!("Cannot expire session for logout: {}", session_token);
         return HttpResponse::InternalServerError().finish();
     }
 
