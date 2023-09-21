@@ -16,7 +16,7 @@ fn decrypt_url(url: &str) -> Result<String, ErrorStack> {
     let encrypted_data_b64 = url.trim().as_bytes();
 
     let encrypted_data = general_purpose::STANDARD
-        .decode(&encrypted_data_b64)
+        .decode(encrypted_data_b64)
         .unwrap();
 
     let cipher = Cipher::des_ecb();

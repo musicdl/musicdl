@@ -27,7 +27,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     match &args.command {
         Commands::Download { query } => {
             let mut res = common::search(query).await?;
-            if res.songs.data.len() < 1 {
+            // println!("{:#?}", res);
+            if res.songs.data.is_empty() {
                 println!("No songs found!!");
             } else {
                 let mut fzf = Command::new("fzf")
@@ -46,40 +47,39 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                 if let Some(stdout) = fzf.stdout.take() {
                     let reader = BufReader::new(stdout);
-                    for line in reader.lines() {
-                        if let Ok(selected_result) = line {
-                            if let Some((s, _)) = selected_result.split_once(":") {
-                                if let Ok(pos) = s.parse::<u32>() {
-                                    if let Some(finalres) =
-                                        res.songs.data.iter().find(|f| f.position == pos)
-                                    {
-                                        let song = common::get_song(&finalres.id).await?;
-                                        let url =
-                                            common::get_media_url(&song.encrypted_media_url, true)?;
-                                        println!("Downloading: {} - {}", song.song, song.album);
+                    for selected_result in reader.lines().flatten() {
+                        if let Some((s, _)) = selected_result.split_once(':') {
+                            if let Ok(pos) = s.parse::<u32>() {
+                                if let Some(finalres) =
+                                    res.songs.data.iter().find(|f| f.position == pos)
+                                {
+                                    let song = common::get_song(&finalres.id).await?;
+                                    println!("{:#?}", song);
+                                    let url =
+                                        common::get_media_url(&song.encrypted_media_url, true)?;
+                                    println!("Downloading: {} - {}", song.song, song.album);
 
-                                        let mut response = reqwest::get(url).await?;
+                                    let mut response = reqwest::get(url).await?;
 
-                                        let content_length =
-                                            response.content_length().expect("File Invalid");
+                                    let content_length =
+                                        response.content_length().expect("File Invalid");
 
-                                        let mut destination =
-                                            File::create(format!("{}.mp3", song.song))
-                                                .await
-                                                .expect("Cannot create file");
+                                    let mut destination =
+                                        File::create(format!("{}.mp3", song.song))
+                                            .await
+                                            .expect("Cannot create file");
 
-                                        let progress_bar = ProgressBar::new(content_length);
-                                        progress_bar.set_style(ProgressStyle::default_bar()
+                                    let progress_bar = ProgressBar::new(content_length);
+                                    progress_bar.set_style(ProgressStyle::default_bar()
                                             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})").expect("???")
                                             .progress_chars("#>-"));
 
-                                        while let Some(bytes) = response.chunk().await? {
-                                            let bytes_read = bytes.len();
-                                            destination.write_all(&bytes).await?;
-                                            progress_bar.inc(bytes_read as u64);
-                                        }
-                                        progress_bar.finish();
+                                    while let Some(bytes) = response.chunk().await? {
+                                        let bytes_read = bytes.len();
+                                        destination.write_all(&bytes).await?;
+                                        progress_bar.inc(bytes_read as u64);
                                     }
+                                    progress_bar.finish();
                                 }
                             }
                         }

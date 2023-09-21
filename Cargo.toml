@@ -4,3 +4,9 @@ members = [
   "web",
   "musicdl"
 ]
+resolver = "2"
+
+[profile.release]
+# Strip Symbols (Lower binary sizes)
+strip = true
+lto = true

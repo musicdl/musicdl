@@ -1,7 +1,7 @@
-use serde_derive::Deserialize;
+use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SearchResult {
     pub albums: DataOf<Album>,
     pub songs: DataOf<Song>,
@@ -10,13 +10,13 @@ pub struct SearchResult {
     pub topquery: DataOf<TopQuery>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct DataOf<T> {
     pub data: Vec<T>,
     pub position: u8,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Album {
     pub id: String,
     pub title: String,
@@ -31,7 +31,7 @@ pub struct Album {
     pub more_info: MoreInfo,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Song {
     pub id: String,
     pub title: String,
@@ -46,7 +46,7 @@ pub struct Song {
     pub more_info: MoreInfo,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SongDetailed {
     pub id: String,
     #[serde(rename = "type")]
@@ -79,7 +79,7 @@ pub struct SongDetailed {
     pub media_preview_url: String,
     pub perma_url: String,
     pub album_url: String,
-    pub duration: String, // Prob seconds?
+    pub duration: String,
     pub rights: SongRights,
     pub webp: bool,
     pub cache_state: String, // ""
@@ -91,7 +91,7 @@ pub struct SongDetailed {
     pub label_url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SongRights {
     pub code: u8,
     pub reason: String,
@@ -99,7 +99,7 @@ pub struct SongRights {
     pub delete_cached_object: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Playlist {
     pub id: String,
     pub title: String,
@@ -114,7 +114,7 @@ pub struct Playlist {
     pub more_info: Option<MoreInfo>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Artist {
     pub id: String,
     pub title: String,
@@ -129,7 +129,7 @@ pub struct Artist {
     pub position: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TopQuery {
     pub id: String,
     pub title: String,
@@ -144,7 +144,7 @@ pub struct TopQuery {
     pub position: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct MoreInfo {
     pub year: Option<String>,
     pub is_movie: Option<String>,

@@ -1,1 +1,6 @@
 /target
+.env
+.sqlx
+logs
+.DS_Store
+
