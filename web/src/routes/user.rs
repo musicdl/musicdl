@@ -1,5 +1,6 @@
-use actix_web::HttpRequest;
+use actix_web::dev::WebService;
 use actix_web::{web, HttpResponse, Responder};
+use actix_web::{HttpRequest, Scope};
 use secrecy::ExposeSecret;
 use serde_json::json;
 
@@ -8,8 +9,15 @@ use crate::db::dao::user::UserDAO;
 use crate::schema;
 use crate::utils;
 
+pub fn make_service() -> Scope {
+    web::scope("/users")
+        .route("/createuser", web::post().to(create_user))
+        .route("/login", web::post().to(login))
+        .route("/logout", web::post().to(logout))
+}
+
 #[tracing::instrument(name = "Create User")]
-pub async fn create_user(
+async fn create_user(
     data: web::Data<sqlx::PgPool>,
     req: web::Json<schema::user::UserCreateReq>,
 ) -> impl Responder {
@@ -52,7 +60,7 @@ pub async fn create_user(
 }
 
 #[tracing::instrument(name = "Login Route")]
-pub async fn login(
+async fn login(
     data: web::Data<sqlx::PgPool>,
     req: web::Json<schema::user::UserLoginReq>,
 ) -> impl Responder {
@@ -94,7 +102,7 @@ pub async fn login(
 }
 
 #[tracing::instrument(name = "Logout Route", skip(data, req))]
-pub async fn logout(data: web::Data<sqlx::PgPool>, req: HttpRequest) -> impl Responder {
+async fn logout(data: web::Data<sqlx::PgPool>, req: HttpRequest) -> impl Responder {
     let session_token = match req
         .headers()
         .get("Authorization")

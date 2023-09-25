@@ -1,7 +1,6 @@
-use actix_web::{web, App, HttpServer};
+use actix_web::{App, HttpServer};
 use color_eyre::Result;
 use dotenvy::dotenv;
-use middlewares::auth::AuthMiddleware;
 use secrecy::{ExposeSecret, Secret};
 use sqlx::postgres::PgPoolOptions;
 use tracing_actix_web::TracingLogger;
@@ -44,48 +43,9 @@ async fn main() -> Result<()> {
         .expect("Cannot create DB pool");
 
     HttpServer::new(move || {
-        App::new().wrap(TracingLogger::default()).service(
-            web::scope("/api")
-                .service(
-                    web::scope("/users")
-                        .route("/createuser", web::post().to(routes::user::create_user))
-                        .route("/login", web::post().to(routes::user::login))
-                        .route("/logout", web::post().to(routes::user::logout)),
-                )
-                .service(
-                    web::scope("/songs")
-                        .route("/search", web::post().to(routes::song::search))
-                        .route("/getsong", web::post().to(routes::song::get_song)),
-                )
-                .service(
-                    web::scope("/playlists")
-                        .wrap(AuthMiddleware)
-                        .route(
-                            "/getalluserplaylist",
-                            web::post().to(routes::playlist::get_all_playlists),
-                        )
-                        .route(
-                            "/getsongs",
-                            web::post().to(routes::playlist::get_all_playlist_songs),
-                            // .route("/ping", web::get().to(ping)),
-                        )
-                        .route(
-                            "/createempty",
-                            web::post().to(routes::playlist::create_empty_playlist),
-                        )
-                        .route(
-                            "/addsongs",
-                            web::post().to(routes::playlist::add_songs_to_playlist),
-                        )
-                        .route(
-                            "/removesongs",
-                            web::post().to(routes::playlist::remove_songs_from_playlist),
-                        )
-                        .route("/rename", web::post().to(routes::playlist::rename_playlist))
-                        .route("/delete", web::post().to(routes::playlist::delete_playlist)),
-                )
-                .app_data(web::Data::new(pool.clone())),
-        )
+        App::new()
+            .wrap(TracingLogger::default())
+            .service(routes::make_routes(&pool))
     })
     //.listen(listener)?
     .bind(("127.0.0.1", 8080))?

@@ -1,13 +1,35 @@
 use crate::db::dao::song::SongsDAO;
 use crate::db::models::Song;
-use actix_web::{web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use actix_service::ServiceFactory;
+use actix_web::dev::{ServiceRequest, ServiceResponse};
+use actix_web::{web, Error, HttpMessage, HttpRequest, HttpResponse, Responder, Scope};
 use serde_json::json;
 
 use crate::db::dao::playlist::PlaylistDAO;
-use crate::schema;
+use crate::{middlewares, schema};
+
+pub fn make_service() -> Scope<
+    impl ServiceFactory<
+        ServiceRequest,
+        Config = (),
+        Response = ServiceResponse,
+        Error = Error,
+        InitError = (),
+    >,
+> {
+    web::scope("/playlists")
+        .wrap(middlewares::auth::AuthMiddleware)
+        .route("/getalluserplaylist", web::post().to(get_all_playlists))
+        .route("/getsongs", web::post().to(get_all_playlist_songs))
+        .route("/createempty", web::post().to(create_empty_playlist))
+        .route("/addsongs", web::post().to(add_songs_to_playlist))
+        .route("/removesongs", web::post().to(remove_songs_from_playlist))
+        .route("/rename", web::post().to(rename_playlist))
+        .route("/delete", web::post().to(delete_playlist))
+}
 
 #[tracing::instrument(name = "Get All User Playlists")]
-pub async fn get_all_playlists(
+async fn get_all_playlists(
     data: web::Data<sqlx::PgPool>,
     req: HttpRequest,
     req_json: web::Json<schema::playlist::GetAllUserPlaylist>,
@@ -37,7 +59,7 @@ pub async fn get_all_playlists(
 }
 
 #[tracing::instrument(name = "Get All Songs By Playlist ID")]
-pub async fn get_all_playlist_songs(
+async fn get_all_playlist_songs(
     data: web::Data<sqlx::PgPool>,
     req: HttpRequest,
     req_json: web::Json<schema::playlist::SinglePlaylist>,
@@ -83,7 +105,7 @@ pub async fn get_all_playlist_songs(
 }
 
 #[tracing::instrument(name = "Create empty playlist")]
-pub async fn create_empty_playlist(
+async fn create_empty_playlist(
     data: web::Data<sqlx::PgPool>,
     req: HttpRequest,
     req_json: web::Json<schema::playlist::CreateEmptyPlaylist>,
@@ -108,7 +130,7 @@ pub async fn create_empty_playlist(
 }
 
 #[tracing::instrument(name = "Add Songs to Playlist (Batch)")]
-pub async fn add_songs_to_playlist(
+async fn add_songs_to_playlist(
     data: web::Data<sqlx::PgPool>,
     req: HttpRequest,
     req_json: web::Json<schema::playlist::UpdateSongsFromPlaylist>,
@@ -125,23 +147,21 @@ pub async fn add_songs_to_playlist(
     let playlist = dao.get_playlist_by_id(playlist_id).await;
 
     match playlist {
-        Ok(some_playlist) => {
-            match some_playlist {
-                Some(playlist) => {
-                    if &playlist.user_id != user_id {
-                        HttpResponse::Unauthorized().finish()
+        Ok(some_playlist) => match some_playlist {
+            Some(playlist) => {
+                if &playlist.user_id != user_id {
+                    HttpResponse::Unauthorized().finish()
+                } else {
+                    let res = dao.add_songs(playlist.clone(), songs.to_vec()).await;
+                    if res.is_ok() {
+                        HttpResponse::Ok().json(json!({ "playlist_id": playlist_id }))
                     } else {
-                        let res = dao.add_songs(playlist.clone(), songs.to_vec()).await;
-                        if res.is_ok() {
-                            HttpResponse::Ok().json(json!({ "playlist_id": playlist_id }))
-                        } else {
-                            tracing::error!("Cannot add songs to playlist: {:#?}", playlist);
-                            HttpResponse::InternalServerError().finish()
-                        }
+                        tracing::error!("Cannot add songs to playlist: {:#?}", playlist);
+                        HttpResponse::InternalServerError().finish()
                     }
-                },
-                None => HttpResponse::NotFound().finish()
+                }
             }
+            None => HttpResponse::NotFound().finish(),
         },
         Err(e) => {
             tracing::error!("Cannot add songs to playlist: {:#?}", e);
@@ -150,9 +170,8 @@ pub async fn add_songs_to_playlist(
     }
 }
 
-
 #[tracing::instrument(name = "Remove Songs from Playlist (Batch)")]
-pub async fn remove_songs_from_playlist(
+async fn remove_songs_from_playlist(
     data: web::Data<sqlx::PgPool>,
     req: HttpRequest,
     req_json: web::Json<schema::playlist::UpdateSongsFromPlaylist>,
@@ -169,23 +188,21 @@ pub async fn remove_songs_from_playlist(
     let playlist = dao.get_playlist_by_id(playlist_id).await;
 
     match playlist {
-        Ok(some_playlist) => {
-            match some_playlist {
-                Some(playlist) => {
-                    if &playlist.user_id != user_id {
-                        HttpResponse::Unauthorized().finish()
+        Ok(some_playlist) => match some_playlist {
+            Some(playlist) => {
+                if &playlist.user_id != user_id {
+                    HttpResponse::Unauthorized().finish()
+                } else {
+                    let res = dao.remove_songs(playlist.clone(), songs.to_vec()).await;
+                    if res.is_ok() {
+                        HttpResponse::Ok().json(json!({ "playlist_id": playlist_id }))
                     } else {
-                        let res = dao.remove_songs(playlist.clone(), songs.to_vec()).await;
-                        if res.is_ok() {
-                            HttpResponse::Ok().json(json!({ "playlist_id": playlist_id }))
-                        } else {
-                            tracing::error!("Cannot remove songs from playlist: {:#?}", playlist);
-                            HttpResponse::InternalServerError().finish()
-                        }
+                        tracing::error!("Cannot remove songs from playlist: {:#?}", playlist);
+                        HttpResponse::InternalServerError().finish()
                     }
-                },
-                None => HttpResponse::NotFound().finish()
+                }
             }
+            None => HttpResponse::NotFound().finish(),
         },
         Err(e) => {
             tracing::error!("Cannot remove songs from playlist: {:#?}", e);
@@ -195,7 +212,7 @@ pub async fn remove_songs_from_playlist(
 }
 
 #[tracing::instrument(name = "Rename Playlist")]
-pub async fn rename_playlist(
+async fn rename_playlist(
     data: web::Data<sqlx::PgPool>,
     req: HttpRequest,
     req_json: web::Json<schema::playlist::UpdatePlaylistName>,
@@ -212,23 +229,21 @@ pub async fn rename_playlist(
     let playlist = dao.get_playlist_by_id(playlist_id).await;
 
     match playlist {
-        Ok(some_playlist) => {
-            match some_playlist {
-                Some(playlist) => {
-                    if &playlist.user_id != user_id {
-                        HttpResponse::Unauthorized().finish()
+        Ok(some_playlist) => match some_playlist {
+            Some(playlist) => {
+                if &playlist.user_id != user_id {
+                    HttpResponse::Unauthorized().finish()
+                } else {
+                    let res = dao.rename_playlist(&playlist, new_name).await;
+                    if res.is_ok() {
+                        HttpResponse::Ok().json(json!({ "playlist_id": playlist_id }))
                     } else {
-                        let res = dao.rename_playlist(&playlist, new_name).await;
-                        if res.is_ok() {
-                            HttpResponse::Ok().json(json!({ "playlist_id": playlist_id }))
-                        } else {
-                            tracing::error!("Cannot rename playlist: {:#?}", playlist);
-                            HttpResponse::InternalServerError().finish()
-                        }
+                        tracing::error!("Cannot rename playlist: {:#?}", playlist);
+                        HttpResponse::InternalServerError().finish()
                     }
-                },
-                None => HttpResponse::NotFound().finish()
+                }
             }
+            None => HttpResponse::NotFound().finish(),
         },
         Err(e) => {
             tracing::error!("Cannot rename playlist: {:#?}", e);
@@ -237,9 +252,8 @@ pub async fn rename_playlist(
     }
 }
 
-
 #[tracing::instrument(name = "Delete Playlist")]
-pub async fn delete_playlist(
+async fn delete_playlist(
     data: web::Data<sqlx::PgPool>,
     req: HttpRequest,
     req_json: web::Json<schema::playlist::SinglePlaylist>,
@@ -255,23 +269,21 @@ pub async fn delete_playlist(
     let playlist = dao.get_playlist_by_id(playlist_id).await;
 
     match playlist {
-        Ok(some_playlist) => {
-            match some_playlist {
-                Some(playlist) => {
-                    if &playlist.user_id != user_id {
-                        HttpResponse::Unauthorized().finish()
+        Ok(some_playlist) => match some_playlist {
+            Some(playlist) => {
+                if &playlist.user_id != user_id {
+                    HttpResponse::Unauthorized().finish()
+                } else {
+                    let res = dao.delete_playlist(&playlist).await;
+                    if res.is_ok() {
+                        HttpResponse::Ok().json(json!({ "playlist_id": playlist_id }))
                     } else {
-                        let res = dao.delete_playlist(&playlist).await;
-                        if res.is_ok() {
-                            HttpResponse::Ok().json(json!({ "playlist_id": playlist_id }))
-                        } else {
-                            tracing::error!("Cannot delete playlist: {:#?}", playlist);
-                            HttpResponse::InternalServerError().finish()
-                        }
+                        tracing::error!("Cannot delete playlist: {:#?}", playlist);
+                        HttpResponse::InternalServerError().finish()
                     }
-                },
-                None => HttpResponse::NotFound().finish()
+                }
             }
+            None => HttpResponse::NotFound().finish(),
         },
         Err(e) => {
             tracing::error!("Cannot delete playlist: {:#?}", e);
