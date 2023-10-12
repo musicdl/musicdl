@@ -5,6 +5,7 @@ use secrecy::{ExposeSecret, Secret};
 use sqlx::postgres::PgPoolOptions;
 use tracing_actix_web::TracingLogger;
 use tracing_subscriber::{prelude::*, Registry};
+use actix_cors::Cors;
 
 mod db;
 mod middlewares;
@@ -42,9 +43,11 @@ async fn main() -> Result<()> {
         .await
         .expect("Cannot create DB pool");
 
+
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
+            .wrap(Cors::permissive())
             .service(routes::make_routes(&pool))
     })
     //.listen(listener)?
