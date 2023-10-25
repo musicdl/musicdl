@@ -75,7 +75,7 @@ export default function Login() {
 
           <div>
             <Link href="/register" className="text-blue-600 text-sm mt-4">
-              Don't have an account?
+              Don&apos;t have an account?
             </Link>
             <button
               type="submit"
